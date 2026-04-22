@@ -1,17 +1,34 @@
 pluginManagement {
     repositories {
+        // 添加阿里云镜像源
+        maven { url=uri('https://maven.aliyun.com/repository/google')  }
+        maven { url=uri('https://maven.aliyun.com/repository/gradle-plugin')  }
+        maven { url=uri('https://maven.aliyun.com/repository/public')  }
+        maven { url=uri('https://maven.aliyun.com/repository/central')  }
+
+        // 默认仓库不要注释，防止上面源找不到的可以从这里补录
         google()
         mavenCentral()
         gradlePluginPortal()
-
+        maven { url 'https://jitpack.io' }
+        maven { url 'https://dl.bintray.com/umsdk/release' }
     }
 }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        // 添加阿里云镜像源
+        maven { url=uri('https://maven.aliyun.com/repository/google')  }
+        maven { url=uri('https://maven.aliyun.com/repository/gradle-plugin')  }
+        maven { url=uri('https://maven.aliyun.com/repository/public')  }
+        maven { url=uri('https://maven.aliyun.com/repository/central')  }
+
+        // 默认仓库不要注释，防止上面源找不到的可以从这里补录
         google()
         mavenCentral()
+        gradlePluginPortal()
         maven { url 'https://jitpack.io' }
+        maven { url 'https://dl.bintray.com/umsdk/release' }
     }
 }
 
