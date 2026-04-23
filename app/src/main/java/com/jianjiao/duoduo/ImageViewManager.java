@@ -5,7 +5,6 @@ import android.content.Context;
 import android.graphics.BitmapFactory;
 import android.graphics.Bitmap;
 import android.graphics.Color;
-import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.util.DisplayMetrics;
 import android.view.ViewConfiguration;
@@ -15,11 +14,15 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AbsListView;
 import android.widget.BaseAdapter;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.text.Editable;
+import android.text.InputType;
+import android.text.TextWatcher;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -35,6 +38,7 @@ public class ImageViewManager {
     private static ImageViewManager INSTANCE;
 
     private static final int TITLE_HEIGHT_DP = 30;
+    private static final int INFO_HEIGHT_DP = 30;
     private static final int MINI_SIZE_DP = 40;
     private static final int CONTENT_PADDING_DP = 12;
     private static final int IMAGE_GAP_DP = 8;
@@ -54,17 +58,13 @@ public class ImageViewManager {
     private int touchSlopPx = 0;
 
     private ListView listView;
-    private ArrayList<Object> imageItems;
+    private EditText userIdValueView;
+    private boolean isSyncingUserId = false;
+    private ArrayList<String> imageItems;
     private ImageGridAdapter adapter;
     public static Context mContext;
     private final Map<String, Bitmap> imageBitmapCache = new HashMap<>();
     private final Set<String> loadingUrls = new HashSet<>();
-
-    public interface OnBindImageViewListener {
-        void onBind(ImageView imageView, Object item, int position);
-    }
-
-    private OnBindImageViewListener onBindImageViewListener;
 
     public static ImageViewManager getInstance() {
         if (INSTANCE == null) {
@@ -80,7 +80,7 @@ public class ImageViewManager {
         FrameLayout root = new FrameLayout(context);
         root.setLayoutParams(new FrameLayout.LayoutParams(
                 getPanelSizePx(context),
-                getPanelSizePx(context) + dp2px(context, TITLE_HEIGHT_DP)
+                getPanelTotalHeightPx(context)
         ));
 
         mainContent = createMainContent(context);
@@ -97,7 +97,7 @@ public class ImageViewManager {
         FrameLayout layout = new FrameLayout(context);
         layout.setLayoutParams(new FrameLayout.LayoutParams(
                 getPanelSizePx(context),
-                getPanelSizePx(context) + dp2px(context, TITLE_HEIGHT_DP)
+                getPanelTotalHeightPx(context)
         ));
 
         LinearLayout bodyLayout = new LinearLayout(context);
@@ -124,7 +124,7 @@ public class ImageViewManager {
                 getPanelSizePx(context),
                 getPanelSizePx(context)
         );
-        bodyLp.topMargin = dp2px(context, TITLE_HEIGHT_DP);
+        bodyLp.topMargin = dp2px(context, TITLE_HEIGHT_DP + INFO_HEIGHT_DP);
         layout.addView(bodyLayout, bodyLp);
 
         LinearLayout titleBar = new LinearLayout(context);
@@ -149,6 +149,23 @@ public class ImageViewManager {
         );
         layout.addView(titleBar, titleLp);
 
+        LinearLayout infoBar = new LinearLayout(context);
+        infoBar.setOrientation(LinearLayout.HORIZONTAL);
+        infoBar.setGravity(Gravity.CENTER_VERTICAL);
+        infoBar.setPadding(dp2px(context, 12), 0, dp2px(context, 12), 0);
+
+        GradientDrawable infoBg = new GradientDrawable();
+        infoBg.setColor(0xFFF3E4CF);
+        infoBg.setStroke(dp2px(context, 1), 0xFFD8B98A);
+        infoBar.setBackground(infoBg);
+
+        FrameLayout.LayoutParams infoLp = new FrameLayout.LayoutParams(
+                getPanelSizePx(context),
+                dp2px(context, INFO_HEIGHT_DP)
+        );
+        infoLp.topMargin = dp2px(context, TITLE_HEIGHT_DP);
+        layout.addView(infoBar, infoLp);
+
         TextView titleText = new TextView(context);
         titleText.setText("任务");
         titleText.setTextColor(0xFFFFF6EE);
@@ -172,6 +189,54 @@ public class ImageViewManager {
         );
         titleBar.addView(minimizeButton, minimizeLp);
 
+        TextView userIdLabel = new TextView(context);
+        userIdLabel.setText("用户ID");
+        userIdLabel.setTextColor(0xFF8B5E3C);
+        userIdLabel.setTextSize(12);
+        infoBar.addView(userIdLabel);
+
+        GradientDrawable userIdBoxBg = new GradientDrawable();
+        userIdBoxBg.setColor(0xFFFFFBF7);
+        userIdBoxBg.setCornerRadius(dp2px(context, 10));
+        userIdBoxBg.setStroke(dp2px(context, 1), 0xFFE1C7A2);
+
+        userIdValueView = new EditText(context);
+        userIdValueView.setTextColor(0xFF5C3A21);
+        userIdValueView.setTextSize(12);
+        userIdValueView.setSingleLine(true);
+        userIdValueView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        userIdValueView.setPadding(dp2px(context, 10), dp2px(context, 4), dp2px(context, 10), dp2px(context, 4));
+        userIdValueView.setHint("请输入用户ID");
+        userIdValueView.setHintTextColor(0xFFB69373);
+        userIdValueView.setInputType(InputType.TYPE_CLASS_TEXT);
+        userIdValueView.setBackground(userIdBoxBg);
+        userIdValueView.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                if (isSyncingUserId) {
+                    return;
+                }
+                jj.userId = s == null ? "" : s.toString().trim();
+            }
+        });
+
+        LinearLayout.LayoutParams userIdValueLp = new LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+        );
+        userIdValueLp.leftMargin = dp2px(context, 10);
+        infoBar.addView(userIdValueView, userIdValueLp);
+        updateUserIdDisplay();
+
         listView = new ListView(context);
         listView.setDivider(null);
         listView.setDividerHeight(0);
@@ -181,7 +246,7 @@ public class ImageViewManager {
         listView.setClipToPadding(false);
 
         imageItems = new ArrayList<>();
-        addPreviewPlaceholders();
+//        addPreviewPlaceholders();
         adapter = new ImageGridAdapter(context);
         listView.setAdapter(adapter);
 
@@ -191,35 +256,9 @@ public class ImageViewManager {
         );
         bodyLayout.addView(listView, listLp);
 
-        titleBar.setOnTouchListener((v, event) -> {
-            if (event.getAction() == MotionEvent.ACTION_DOWN) {
-                downRawX = event.getRawX();
-                downRawY = event.getRawY();
-                touchX = event.getRawX() - floatView.getX();
-                touchY = event.getRawY() - floatView.getY();
-                isMoved = false;
-                return true;
-            }
-            if (event.getAction() == MotionEvent.ACTION_MOVE) {
-                float deltaX = event.getRawX() - downRawX;
-                float deltaY = event.getRawY() - downRawY;
-                if (!isMoved && Math.hypot(deltaX, deltaY) > touchSlopPx) {
-                    isMoved = true;
-                }
-                if (isMoved) {
-                    saveX = event.getRawX() - touchX;
-                    saveY = event.getRawY() - touchY;
-                    floatView.setX(saveX);
-                    floatView.setY(saveY);
-                }
-                return true;
-            }
-            if (event.getAction() == MotionEvent.ACTION_UP) {
-                v.performClick();
-                return true;
-            }
-            return true;
-        });
+        titleBar.setOnTouchListener(this::handlePanelDragTouch);
+        bodyLayout.setOnTouchListener(this::handlePanelDragTouch);
+        listView.setOnTouchListener(this::handlePanelDragTouch);
 
         return layout;
     }
@@ -300,25 +339,22 @@ public class ImageViewManager {
             mainContent.setVisibility(View.VISIBLE);
             floatView.setLayoutParams(new FrameLayout.LayoutParams(
                     getPanelSizePx(mContext),
-                    getPanelSizePx(mContext) + dp2px(mContext, TITLE_HEIGHT_DP)
+                    getPanelTotalHeightPx(mContext)
             ));
+            updateUserIdDisplay();
         });
     }
 
-    public void setOnBindImageViewListener(OnBindImageViewListener listener) {
-        onBindImageViewListener = listener;
-        notifyImageChanged();
-    }
-
-    public void addImageItem(Object item) {
+    public void addImageItem(String imageUrl) {
         if (!(mContext instanceof Activity) || imageItems == null || adapter == null) return;
+        if (imageUrl == null || imageUrl.trim().isEmpty()) return;
         ((Activity) mContext).runOnUiThread(() -> {
-            imageItems.add(item);
+            imageItems.add(imageUrl);
             adapter.notifyDataSetChanged();
         });
     }
 
-    public void addImageItems(Collection<?> items) {
+    public void addImageItems(Collection<String> items) {
         if (!(mContext instanceof Activity) || imageItems == null || adapter == null || items == null || items.isEmpty()) return;
         ((Activity) mContext).runOnUiThread(() -> {
             imageItems.addAll(items);
@@ -343,12 +379,31 @@ public class ImageViewManager {
         });
     }
 
-    public void addItem(String text) {
-        addImageItem(text);
-    }
-
     public void clearList() {
         clearImageItems();
+    }
+
+    public static void postImage(String imageUrl) {
+        getInstance().addImageItem(imageUrl);
+    }
+
+    public static void postImage(String imageUrl, String ignoredText) {
+        getInstance().addImageItem(imageUrl);
+    }
+
+    public static void removeImage(String imageUrl) {
+        if (!(mContext instanceof Activity)) return;
+        ImageViewManager manager = getInstance();
+        if (manager.imageItems == null || manager.adapter == null || imageUrl == null) return;
+        ((Activity) mContext).runOnUiThread(() -> {
+            if (manager.imageItems.remove(imageUrl)) {
+                manager.adapter.notifyDataSetChanged();
+            }
+        });
+    }
+
+    public static void clearImages() {
+        getInstance().clearImageItems();
     }
 
     public void attachTo(Activity activity) {
@@ -366,6 +421,7 @@ public class ImageViewManager {
         floatView.setX(saveX);
         floatView.setY(saveY);
         decor.addView(floatView);
+        updateUserIdDisplay();
     }
 
     private void notifyImageChanged() {
@@ -373,29 +429,16 @@ public class ImageViewManager {
         ((Activity) mContext).runOnUiThread(() -> adapter.notifyDataSetChanged());
     }
 
-    private void bindImage(ImageView imageView, Object item, int position) {
+    private void bindImage(ImageView imageView, String imageUrl) {
         imageView.setImageDrawable(null);
         imageView.setBackgroundColor(0xFFEFDCC6);
 
-        if (item instanceof Drawable) {
-            imageView.setImageDrawable((Drawable) item);
-        } else if (item instanceof Bitmap) {
-            imageView.setImageBitmap((Bitmap) item);
-        } else if (item instanceof Integer) {
-            imageView.setImageResource((Integer) item);
-        } else if (item instanceof String) {
-            String url = (String) item;
-            Bitmap bitmap = imageBitmapCache.get(url);
-            if (bitmap != null) {
-                imageView.setImageBitmap(bitmap);
-            } else {
-                imageView.setImageResource(android.R.color.transparent);
-                loadImageFromUrl(url);
-            }
-        }
-
-        if (onBindImageViewListener != null) {
-            onBindImageViewListener.onBind(imageView, item, position);
+        Bitmap bitmap = imageBitmapCache.get(imageUrl);
+        if (bitmap != null) {
+            imageView.setImageBitmap(bitmap);
+        } else {
+            imageView.setImageResource(android.R.color.transparent);
+            loadImageFromUrl(imageUrl);
         }
     }
 
@@ -403,17 +446,21 @@ public class ImageViewManager {
         if (imageItems == null || !imageItems.isEmpty()) {
             return;
         }
-        imageItems.add(createPlaceholderDrawable(0xFFE7A977));
-        imageItems.add(createPlaceholderDrawable(0xFF94B49F));
-        imageItems.add(createPlaceholderDrawable(0xFF7FA7C9));
-        imageItems.add(createPlaceholderDrawable(0xFFD9A5B3));
+        imageItems.add("preview://warm");
+        imageItems.add("preview://green");
+        imageItems.add("preview://blue");
+        imageItems.add("preview://pink");
+        imageBitmapCache.put("preview://warm", createPlaceholderBitmap(0xFFE7A977));
+        imageBitmapCache.put("preview://green", createPlaceholderBitmap(0xFF94B49F));
+        imageBitmapCache.put("preview://blue", createPlaceholderBitmap(0xFF7FA7C9));
+        imageBitmapCache.put("preview://pink", createPlaceholderBitmap(0xFFD9A5B3));
     }
 
-    private Drawable createPlaceholderDrawable(int color) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(color);
-        drawable.setCornerRadius(dp2px(mContext, IMAGE_CORNER_DP));
-        return drawable;
+    private Bitmap createPlaceholderBitmap(int color) {
+        int size = dp2px(mContext, 96);
+        Bitmap bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+        bitmap.eraseColor(color);
+        return bitmap;
     }
 
     private void loadImageFromUrl(String url) {
@@ -461,9 +508,66 @@ public class ImageViewManager {
 
     private int getPanelSizePx(Context context) {
         DisplayMetrics displayMetrics = context.getResources().getDisplayMetrics();
-        int halfScreenWidth = displayMetrics.widthPixels / 2;
+        int targetWidth = (int) (displayMetrics.widthPixels * 0.7f);
         int minSize = dp2px(context, 180);
-        return Math.max(halfScreenWidth, minSize);
+        return Math.max(targetWidth, minSize);
+    }
+
+    private int getPanelTotalHeightPx(Context context) {
+        return getPanelSizePx(context) + dp2px(context, TITLE_HEIGHT_DP + INFO_HEIGHT_DP);
+    }
+
+    private boolean handlePanelDragTouch(View v, MotionEvent event) {
+        if (floatView == null) {
+            return false;
+        }
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            downRawX = event.getRawX();
+            downRawY = event.getRawY();
+            touchX = event.getRawX() - floatView.getX();
+            touchY = event.getRawY() - floatView.getY();
+            isMoved = false;
+            return true;
+        }
+        if (event.getAction() == MotionEvent.ACTION_MOVE) {
+            float deltaX = event.getRawX() - downRawX;
+            float deltaY = event.getRawY() - downRawY;
+            if (!isMoved && Math.hypot(deltaX, deltaY) > touchSlopPx) {
+                isMoved = true;
+            }
+            if (isMoved) {
+                saveX = event.getRawX() - touchX;
+                saveY = event.getRawY() - touchY;
+                floatView.setX(saveX);
+                floatView.setY(saveY);
+            }
+            return true;
+        }
+        if (event.getAction() == MotionEvent.ACTION_UP) {
+            if (isMoved) {
+                v.performClick();
+            }
+            return true;
+        }
+        return true;
+    }
+
+    private void updateUserIdDisplay() {
+        if (userIdValueView == null) {
+            return;
+        }
+        String currentUserId = jj.userId;
+        if (currentUserId == null) {
+            currentUserId = "";
+        }
+        String inputValue = userIdValueView.getText() == null ? "" : userIdValueView.getText().toString();
+        if (inputValue.equals(currentUserId)) {
+            return;
+        }
+        isSyncingUserId = true;
+        userIdValueView.setText(currentUserId);
+        userIdValueView.setSelection(currentUserId.length());
+        isSyncingUserId = false;
     }
 
     private class ImageGridAdapter extends BaseAdapter {
@@ -560,11 +664,14 @@ public class ImageViewManager {
                 if (itemIndex < imageItems.size()) {
                     cell.setVisibility(View.VISIBLE);
                     imageView.setVisibility(View.VISIBLE);
-                    bindImage(imageView, imageItems.get(itemIndex), itemIndex);
+                    bindImage(imageView, imageItems.get(itemIndex));
+                    final int currentIndex = itemIndex;
+                    cell.setOnClickListener(v -> removeImageItem(currentIndex));
                 } else {
                     imageView.setImageDrawable(null);
                     imageView.setVisibility(View.INVISIBLE);
                     cell.setVisibility(View.INVISIBLE);
+                    cell.setOnClickListener(null);
                 }
             }
 
